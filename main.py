@@ -180,7 +180,7 @@ class VerifyView(discord.ui.View):
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         CIVILIAN_ROLE_ID = 1537473046158246021  # Your Civilian role ID
-        UNVERIFIED_ROLE_ID = 0  # <--- REPLACE WITH YOUR UNVERIFIED ROLE ID IF APPLICABLE
+        UNVERIFIED_ROLE_ID = 1541806282036617289  # <--- REPLACE WITH YOUR UNVERIFIED ROLE ID IF APPLICABLE
 
         civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
         unverified_role = interaction.guild.get_role(UNVERIFIED_ROLE_ID) if UNVERIFIED_ROLE_ID != 0 else None
