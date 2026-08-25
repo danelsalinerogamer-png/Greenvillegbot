@@ -180,7 +180,7 @@ class VerifyView(discord.ui.View):
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         CIVILIAN_ROLE_ID = 1537473046158246021  # Your Civilian role ID
-        UNVERIFIED_ROLE_ID = 0  # <--- REPLACE 0 WITH YOUR UNVERIFIED ROLE ID!
+        UNVERIFIED_ROLE_ID = 0  # <--- REPLACE WITH YOUR UNVERIFIED ROLE ID IF APPLICABLE
 
         civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
         unverified_role = interaction.guild.get_role(UNVERIFIED_ROLE_ID) if UNVERIFIED_ROLE_ID != 0 else None
@@ -189,7 +189,6 @@ class VerifyView(discord.ui.View):
             await interaction.response.send_message("Civilian role not found! Please check the Role ID in code.", ephemeral=True)
             return
 
-        # Give Civilian role and remove Unverified role
         try:
             if civilian_role not in interaction.user.roles:
                 await interaction.user.add_roles(civilian_role)
@@ -198,7 +197,7 @@ class VerifyView(discord.ui.View):
                 await interaction.user.remove_roles(unverified_role)
                 
             await interaction.response.send_message("🎉 You have been successfully verified! Unverified role removed, Civilian role added.", ephemeral=True)
-        except Exception as e:
+        except Exception:
             await interaction.response.send_message("Failed to update roles. Make sure the bot's role is higher than the roles it is trying to assign!", ephemeral=True)
 
 # --- SLASH COMMAND GROUPS ---
@@ -330,19 +329,25 @@ async def shift_leaderboard(interaction: discord.Interaction):
 @app_commands.describe(channel="The channel to send the verification embed in")
 async def verify_startup(interaction: discord.Interaction, channel: discord.TextChannel):
     await interaction.response.defer(ephemeral=True)
-    embed = discord.Embed(
-        title="🔒 Server Verification",
-        description="Click the **Verify** button below to remove your unverified status and get access to **Greenville Roleplay Globe**!",
-        color=discord.Color.green()
-    )
-    embed.set_footer(text="Greenville Roleplay Globe • Security")
+    try:
+        embed = discord.Embed(
+            title="🔒 Server Verification",
+            description="Click the **Verify** button below to remove your unverified status and get access to **Greenville Roleplay Globe**!",
+            color=discord.Color.green()
+        )
+        embed.set_footer(text="Greenville Roleplay Globe • Security")
 
-    view = VerifyView()
-    await channel.send(embed=embed, view=view)
-    await interaction.followup.send(
-        f"Verification panel successfully sent to {channel.mention}!",
-        ephemeral=True,
-    )
+        view = VerifyView()
+        await channel.send(embed=embed, view=view)
+        await interaction.followup.send(
+            f"Verification panel successfully sent to {channel.mention}!",
+            ephemeral=True,
+        )
+    except Exception:
+        await interaction.followup.send(
+            f"Failed to send panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
+            ephemeral=True,
+        )
 
 # --- STAFF COMMANDS ---
 @staff_group.command(name="app-closed", description="Post closed/under review applications embed")
