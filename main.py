@@ -179,18 +179,24 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        VERIFIED_ROLE_ID = 1537473046158246021
+        CIVILIAN_ROLE_ID = 1537473046158246021  # Your verified/civilian role ID
+        UNVERIFIED_ROLE_ID = 0  # Replace 0 with your Unverified role ID if you use one
 
-        role = interaction.guild.get_role(VERIFIED_ROLE_ID)
-        if not role:
-            await interaction.response.send_message("Verification role not found! Please contact an administrator.", ephemeral=True)
+        civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
+        unverified_role = interaction.guild.get_role(UNVERIFIED_ROLE_ID) if UNVERIFIED_ROLE_ID != 0 else None
+
+        if not civilian_role:
+            await interaction.response.send_message("Role not found! Please contact an administrator.", ephemeral=True)
             return
 
-        if role in interaction.user.roles:
+        if civilian_role in interaction.user.roles:
             await interaction.response.send_message("You are already verified!", ephemeral=True)
         else:
-            await interaction.user.add_roles(role)
-            await interaction.response.send_message("🎉 You have been successfully verified!", ephemeral=True)
+            await interaction.user.add_roles(civilian_role)
+            if unverified_role and unverified_role in interaction.user.roles:
+                await interaction.user.remove_roles(unverified_role)
+                
+            await interaction.response.send_message("🎉 You have been successfully verified and given the Civilian role!", ephemeral=True)
 
 # --- SLASH COMMAND GROUPS ---
 session_group = app_commands.Group(name="session", description="Manage roleplay sessions")
