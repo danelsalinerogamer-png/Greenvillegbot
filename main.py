@@ -179,29 +179,33 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        CIVILIAN_ROLE_ID = 1537473046158246021  # Your verified/civilian role ID
-        UNVERIFIED_ROLE_ID = 0  # Replace 0 with your Unverified role ID if you use one
+        CIVILIAN_ROLE_ID = 1537473046158246021  # Your Civilian role ID
+        UNVERIFIED_ROLE_ID = 0  # <--- REPLACE 0 WITH YOUR UNVERIFIED ROLE ID!
 
         civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
         unverified_role = interaction.guild.get_role(UNVERIFIED_ROLE_ID) if UNVERIFIED_ROLE_ID != 0 else None
 
         if not civilian_role:
-            await interaction.response.send_message("Role not found! Please contact an administrator.", ephemeral=True)
+            await interaction.response.send_message("Civilian role not found! Please check the Role ID in code.", ephemeral=True)
             return
 
-        if civilian_role in interaction.user.roles:
-            await interaction.response.send_message("You are already verified!", ephemeral=True)
-        else:
-            await interaction.user.add_roles(civilian_role)
+        # Give Civilian role and remove Unverified role
+        try:
+            if civilian_role not in interaction.user.roles:
+                await interaction.user.add_roles(civilian_role)
+            
             if unverified_role and unverified_role in interaction.user.roles:
                 await interaction.user.remove_roles(unverified_role)
                 
-            await interaction.response.send_message("🎉 You have been successfully verified and given the Civilian role!", ephemeral=True)
+            await interaction.response.send_message("🎉 You have been successfully verified! Unverified role removed, Civilian role added.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message("Failed to update roles. Make sure the bot's role is higher than the roles it is trying to assign!", ephemeral=True)
 
 # --- SLASH COMMAND GROUPS ---
 session_group = app_commands.Group(name="session", description="Manage roleplay sessions")
 shift_group = app_commands.Group(name="shift", description="Manage staff shifts")
 staff_group = app_commands.Group(name="staff", description="Staff management commands")
+verify_group = app_commands.Group(name="verify", description="Verification commands")
 application_group = app_commands.Group(name="application", description="Application management commands")
 
 # --- SESSION COMMANDS ---
@@ -321,6 +325,25 @@ async def shift_leaderboard(interaction: discord.Interaction):
     embed.description = description or "No data available."
     await interaction.followup.send(embed=embed)
 
+# --- VERIFY COMMANDS ---
+@verify_group.command(name="startup", description="Post the verification panel button")
+@app_commands.describe(channel="The channel to send the verification embed in")
+async def verify_startup(interaction: discord.Interaction, channel: discord.TextChannel):
+    await interaction.response.defer(ephemeral=True)
+    embed = discord.Embed(
+        title="🔒 Server Verification",
+        description="Click the **Verify** button below to remove your unverified status and get access to **Greenville Roleplay Globe**!",
+        color=discord.Color.green()
+    )
+    embed.set_footer(text="Greenville Roleplay Globe • Security")
+
+    view = VerifyView()
+    await channel.send(embed=embed, view=view)
+    await interaction.followup.send(
+        f"Verification panel successfully sent to {channel.mention}!",
+        ephemeral=True,
+    )
+
 # --- STAFF COMMANDS ---
 @staff_group.command(name="app-closed", description="Post closed/under review applications embed")
 async def app_closed(interaction: discord.Interaction):
@@ -434,6 +457,7 @@ async def demote(interaction: discord.Interaction, user: discord.Member, old_ran
 # --- REGISTER COMMAND GROUPS TO BOT.TREE ---
 bot.tree.add_command(session_group)
 bot.tree.add_command(shift_group)
+bot.tree.add_command(verify_group)
 bot.tree.add_command(staff_group)
 bot.tree.add_command(application_group)
 
