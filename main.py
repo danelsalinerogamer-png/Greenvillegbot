@@ -200,12 +200,21 @@ application_group = app_commands.Group(name="application", description="Applicat
 
 # --- SESSION COMMANDS ---
 @session_group.command(name="vote", description="Start a session attendance vote")
-async def session_vote(interaction: discord.Interaction):
+@app_commands.describe(
+    min_reacts="Minimum reactions required for session to start",
+    description="Optional description or details for the vote"
+)
+async def session_vote(interaction: discord.Interaction, min_reacts: int = None, description: str = None):
     await interaction.response.defer()
     global session_vote_msg
+    
+    desc = description if description else "React with ✅ if you plan on attending the upcoming session!"
+    if min_reacts:
+        desc += f"\n\n📌 **Minimum Reacts Needed:** {min_reacts}"
+
     embed = discord.Embed(
         title="🚗 Session Attendance Vote",
-        description="React with ✅ if you plan on attending the upcoming session!",
+        description=desc,
         color=discord.Color.green()
     )
     embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540780344620490752/image0.jpg")
@@ -215,8 +224,12 @@ async def session_vote(interaction: discord.Interaction):
     await session_vote_msg.add_reaction("❌")
 
 @session_group.command(name="start", description="Announce the start of a session")
-@app_commands.describe(link="Optional server link to join directly")
-async def session_start(interaction: discord.Interaction, link: str = None):
+@app_commands.describe(
+    link="Optional server link to join directly",
+    frp_limit="Optional FRP speed limit or rule setup",
+    description="Optional extra details for the session start"
+)
+async def session_start(interaction: discord.Interaction, link: str = None, frp_limit: str = None, description: str = None):
     await interaction.response.defer()
     global session_vote_msg
     if session_vote_msg:
@@ -226,7 +239,9 @@ async def session_start(interaction: discord.Interaction, link: str = None):
             pass
         session_vote_msg = None
 
-    desc = "The roleplay session is now **ACTIVE**! Jump in-game."
+    desc = description if description else "The roleplay session is now **ACTIVE**! Jump in-game."
+    if frp_limit:
+        desc += f"\n\n⚡ **FRP Limit:** {frp_limit}"
     if link:
         desc += f"\n\n🔗 **Join Link:** {link}"
 
@@ -420,7 +435,7 @@ bot.tree.add_command(application_group)
 async def on_ready():
     bot.add_view(ShiftView())
     bot.add_view(VerifyView())
-    await bot.tree.sync()  # <--- THIS WAS MISSING AND CAUSED COMMAND FAILURES
+    await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
 # Start the web server and run the bot
