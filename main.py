@@ -228,6 +228,19 @@ class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=True)
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete()
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Close With Reason", style=discord.ButtonStyle.danger, emoji="📝", custom_id="close_reason_ticket_btn")
+    async def close_reason_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(CloseReasonModal())
+
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.success, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
     async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = interaction.message.embeds[0]
@@ -250,19 +263,6 @@ class TicketCloseView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"🔒 This ticket has been claimed by {interaction.user.mention}.", ephemeral=False)
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=True)
-        await asyncio.sleep(5)
-        try:
-            await interaction.channel.delete()
-        except Exception:
-            pass
-
-    @discord.ui.button(label="Close with Reason", style=discord.ButtonStyle.danger, emoji="📝", custom_id="close_reason_ticket_btn")
-    async def close_reason_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(CloseReasonModal())
-
 # --- TICKET DROPDOWN & MODAL ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
@@ -276,9 +276,9 @@ class TicketSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         category_name = self.values[0]
         titles = {
-            "general": "General Support Ticket",
-            "staff_report": "Staff Report Ticket",
-            "affiliation": "Affiliation Request Ticket"
+            "general": "General Support",
+            "staff_report": "Staff Report",
+            "affiliation": "Affiliation Request"
         }
         await interaction.response.send_modal(TicketModal(title=titles[category_name], category=category_name))
 
@@ -287,20 +287,22 @@ class TicketModal(discord.ui.Modal):
         super().__init__(title=title)
         self.category = category
 
-        label_text = "Please describe your issue or request"
-        if category == "affiliation":
-            label_text = "Provide Server Name, Member Count, & Partnership Info"
+        if category == "general":
+            self.field1 = discord.ui.TextInput(label="Ping yourself", style=discord.TextStyle.short, placeholder="@YourName", required=True)
+            self.field2 = discord.ui.TextInput(label="Enquiry", style=discord.TextStyle.paragraph, placeholder="Type your enquiry here...", required=True)
+            self.field3 = discord.ui.TextInput(label="Additional Info", style=discord.TextStyle.paragraph, placeholder="Any extra information...", required=False)
         elif category == "staff_report":
-            label_text = "Provide staff member name and evidence description"
+            self.field1 = discord.ui.TextInput(label="Ping yourself", style=discord.TextStyle.short, placeholder="@YourName", required=True)
+            self.field2 = discord.ui.TextInput(label="Ping staff", style=discord.TextStyle.short, placeholder="@StaffMember", required=True)
+            self.field3 = discord.ui.TextInput(label="Details", style=discord.TextStyle.paragraph, placeholder="Describe the situation...", required=True)
+        else: # affiliation
+            self.field1 = discord.ui.TextInput(label="Server Name", style=discord.TextStyle.short, placeholder="Your server name", required=True)
+            self.field2 = discord.ui.TextInput(label="Member Count", style=discord.TextStyle.short, placeholder="e.g. 500 members", required=True)
+            self.field3 = discord.ui.TextInput(label="Do you agree to stay in the server?", style=discord.TextStyle.short, placeholder="Yes/No", required=True)
 
-        self.reason = discord.ui.TextInput(
-            label=label_text,
-            style=discord.TextStyle.paragraph,
-            placeholder="Type your details here...",
-            required=True,
-            max_length=1000
-        )
-        self.add_item(self.reason)
+        self.add_item(self.field1)
+        self.add_item(self.field2)
+        self.add_item(self.field3)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -315,20 +317,37 @@ class TicketModal(discord.ui.Modal):
         channel_name = f"ticket-{ticket_num}"
         ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
 
+        if self.category == "general":
+            desc = (
+                f"Thank you for opening a general support ticket. Please follow the format below:\n\n"
+                f"**Ping yourself:** {self.field1.value}\n"
+                f"**Enquiry:** {self.field2.value}\n"
+                f"**Additional Info:** {self.field3.value or 'None'}"
+            )
+        elif self.category == "staff_report":
+            desc = (
+                f"Thank you for opening a staff report ticket. Please follow the format below:\n\n"
+                f"**Ping yourself:** {self.field1.value}\n"
+                f"**Ping staff:** {self.field2.value}\n"
+                f"**Details:** {self.field3.value}"
+            )
+        else:
+            desc = (
+                f"Thank you for requesting an affiliation, please follow the format below:\n\n"
+                f"**Server Name:** {self.field1.value}\n"
+                f"**Member Count:** {self.field2.value}\n"
+                f"**Do you agree to stay in the server?:** {self.field3.value}"
+            )
+
         embed = discord.Embed(
-            title=f"GVRG Support — Ticket #{ticket_num}",
-            description=(
-                f"**Category:** {self.title}\n"
-                f"**Author:** {interaction.user.mention}\n"
-                f"**Status:** Unclaimed\n\n"
-                f"**Description / Details:**\n{self.reason.value}"
-            ),
+            title=self.title,
+            description=desc,
             color=discord.Color.from_rgb(46, 204, 113)
         )
-        embed.set_footer(text="Greenville Roleplay Globe (GVRG) • Support System")
+        embed.set_footer(text="Powered by GVRG Support")
 
         close_view = TicketCloseView()
-        await ticket_channel.send(content=f"{interaction.user.mention} Staff will be with you shortly.", embed=embed, view=close_view)
+        await ticket_channel.send(content=f"{interaction.user.mention}", embed=embed, view=close_view)
         await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
 
 class TicketView(discord.ui.View):
