@@ -231,7 +231,6 @@ class TicketModal(discord.ui.Modal):
         super().__init__(title=title)
         self.category = category
 
-        # Tailor placeholder/label slightly depending on category
         label_text = "Please describe your issue or request"
         if category == "affiliation":
             label_text = "Provide Server Name, Member Count, & Partnership Info"
@@ -248,6 +247,7 @@ class TicketModal(discord.ui.Modal):
         self.add_item(self.reason)
 
     async def on_submit(self, interaction: discord.Interaction):
+        # Defer immediately to prevent interaction timeout errors
         await interaction.response.defer(ephemeral=True)
         
         guild = interaction.guild
