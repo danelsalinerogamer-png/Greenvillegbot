@@ -223,13 +223,22 @@ class CloseReasonModal(discord.ui.Modal, title="Close Ticket with Reason"):
         except Exception:
             pass
 
-# --- TICKET CLOSE VIEW ---
+# --- TICKET CLOSE VIEW WITH STAFF PERMISSION CHECK ---
 class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
+    def is_staff(self, member: discord.Member) -> bool:
+        if member.guild_permissions.administrator:
+            return True
+        return any(role.name in ["Staff", "Moderator", "Administrator"] for role in member.roles)
+
     @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.is_staff(interaction.user):
+            await interaction.response.send_message("❌ You do not have permission to close this ticket.", ephemeral=True)
+            return
+
         await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=True)
         await asyncio.sleep(5)
         try:
@@ -239,10 +248,18 @@ class TicketCloseView(discord.ui.View):
 
     @discord.ui.button(label="Close With Reason", style=discord.ButtonStyle.danger, emoji="📝", custom_id="close_reason_ticket_btn")
     async def close_reason_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.is_staff(interaction.user):
+            await interaction.response.send_message("❌ You do not have permission to close this ticket.", ephemeral=True)
+            return
+
         await interaction.response.send_modal(CloseReasonModal())
 
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.success, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
     async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.is_staff(interaction.user):
+            await interaction.response.send_message("❌ You do not have permission to claim this ticket.", ephemeral=True)
+            return
+
         embed = interaction.message.embeds[0]
         desc_lines = embed.description.split("\n")
         new_desc_lines = []
@@ -311,44 +328,49 @@ class TicketModal(discord.ui.Modal):
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
         }
 
-        ticket_num = get_next_ticket_number()
-        channel_name = f"ticket-{ticket_num}"
-        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+        try:
+            ticket_num = get_next_ticket_number()
+            channel_name = f"ticket-{ticket_num}"
+            ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
 
-        if self.category == "general":
-            desc = (
-                f"Thank you for opening a general support ticket. Please follow the format below:\n\n"
-                f"**Ping yourself:** {self.field1.value}\n"
-                f"**Enquiry:** {self.field2.value}\n"
-                f"**Additional Info:** {self.field3.value or 'None'}"
-            )
-        elif self.category == "staff_report":
-            desc = (
-                f"Thank you for opening a staff report ticket. Please follow the format below:\n\n"
-                f"**Ping yourself:** {self.field1.value}\n"
-                f"**Ping staff:** {self.field2.value}\n"
-                f"**Details:** {self.field3.value}"
-            )
-        else:
-            desc = (
-                f"Thank you for requesting an affiliation, please follow the format below:\n\n"
-                f"**Server Name:** {self.field1.value}\n"
-                f"**Member Count:** {self.field2.value}\n"
-                f"**Do you agree to stay in the server?:** {self.field3.value}"
-            )
+            if self.category == "general":
+                desc = (
+                    f"Thank you for opening a general support ticket. Please follow the format below:\n\n"
+                    f"**Ping yourself:** {self.field1.value}\n\n"
+                    f"**Enquiry:** {self.field2.value}\n\n"
+                    f"**Additional Info:** {self.field3.value or 'None'}"
+                )
+            elif self.category == "staff_report":
+                desc = (
+                    f"Thank you for opening a staff report ticket. Please follow the format below:\n\n"
+                    f"**Ping yourself:** {self.field1.value}\n\n"
+                    f"**Ping staff:** {self.field2.value}\n\n"
+                    f"**Details:** {self.field3.value}"
+                )
+            else:
+                desc = (
+                    f"Thank you for requesting an affiliation, please follow the format below:\n\n"
+                    f"**Server Name:** {self.field1.value}\n\n"
+                    f"**Member Count:** {self.field2.value}\n\n"
+                    f"**Do you agree to stay in the server?:** {self.field3.value}"
+                )
 
-        embed = discord.Embed(
-            title=self.title,
-            description=desc,
-            color=discord.Color.from_rgb(46, 204, 113)
-        )
-        embed.set_footer(text="Powered by GVRG Support")
+            embed = discord.Embed(
+                title=self.title,
+                description=desc,
+                color=discord.Color.from_rgb(46, 204, 113)
+            )
+            embed.set_footer(text="Powered by GVRG Support")
 
-        close_view = TicketCloseView()
-        await ticket_channel.send(content=f"{interaction.user.mention}", embed=embed, view=close_view)
-        await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
+            close_view = TicketCloseView()
+            await ticket_channel.send(content=f"{interaction.user.mention}", embed=embed, view=close_view)
+            await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
+        except Exception as e:
+            print(f"CRITICAL TICKET ERROR: {e}")
+            await interaction.followup.send(f"An error occurred while creating your ticket: {e}", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -469,12 +491,14 @@ async def app_open(interaction: discord.Interaction):
 async def staff_report_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
     
-    # Updated main panel embed description mirroring your layout example with definitions
     panel_desc = (
         "**Welcome to the GVRG Support Center.** To receive assistance, please open a formal support ticket within this channel; our staff team aims to address all inquiries efficiently.\n\n"
-        "**General Support** - For any random questions, enquiries, or perk requests.\n"
-        "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n"
-        "**Affiliation Request** - Request a partnership with GVRG."
+        "🔸 **General Support**\n"
+        "For any random questions, enquiries, or perk requests.\n\n"
+        "🔸 **Staff Report**\n"
+        "Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
+        "🔸 **Affiliation Request**\n"
+        "Request a partnership with GVRG."
     )
     
     embed = discord.Embed(title="GVRG Support", description=panel_desc, color=discord.Color.from_rgb(46, 204, 113))
@@ -489,9 +513,12 @@ async def ticket_setup(interaction: discord.Interaction, channel: discord.TextCh
     
     panel_desc = (
         "**Welcome to the GVRG Support Center.** To receive assistance, please open a formal support ticket within this channel; our staff team aims to address all inquiries efficiently.\n\n"
-        "**General Support** - For any random questions, enquiries, or perk requests.\n"
-        "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n"
-        "**Affiliation Request** - Request a partnership with GVRG."
+        "🔸 **General Support**\n"
+        "For any random questions, enquiries, or perk requests.\n\n"
+        "🔸 **Staff Report**\n"
+        "Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
+        "🔸 **Affiliation Request**\n"
+        "Request a partnership with GVRG."
     )
 
     embed = discord.Embed(title="GVRG Support", description=panel_desc, color=discord.Color.from_rgb(46, 204, 113))
