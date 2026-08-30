@@ -231,7 +231,7 @@ class TicketCloseView(discord.ui.View):
     def is_staff(self, member: discord.Member) -> bool:
         if member.guild_permissions.administrator:
             return True
-        return any(role.name in ["Staff", "Moderator", "Administrator"] for role in member.roles)
+        return any(role.name in ["🛡 High Ranking Department", "Senior Administrator", "Administrator"] for role in member.roles)
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
