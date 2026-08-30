@@ -45,7 +45,6 @@ def save_data(data):
 
 def get_next_ticket_number():
     data = load_data()
-    # Keep track of ticket counter inside json database
     current_count = data.get("ticket_counter", 0) + 1
     data["ticket_counter"] = current_count
     save_data(data)
@@ -224,6 +223,7 @@ class TicketSelect(discord.ui.Select):
             "staff_report": "Staff Report Ticket",
             "affiliation": "Affiliation Request Ticket"
         }
+        # Instantly open the modal to prevent any 3-second timeout errors
         await interaction.response.send_modal(TicketModal(title=titles[category_name], category=category_name))
 
 class TicketModal(discord.ui.Modal):
@@ -247,7 +247,7 @@ class TicketModal(discord.ui.Modal):
         self.add_item(self.reason)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Acknowledge the interaction immediately to prevent the 3-second timeout error for all categories
+        # Defer immediately since creating channels can take time
         await interaction.response.defer(ephemeral=True)
         
         guild = interaction.guild
