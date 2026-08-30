@@ -205,7 +205,7 @@ class TicketSelect(discord.ui.Select):
         options = [
             discord.SelectOption(label="General Support", description="For any random, questions or enquiries or perk requests", emoji="❓", value="general"),
             discord.SelectOption(label="Staff Report", description="Feel like a staff member has treated you unfairly?", emoji="⚠️", value="staff_report"),
-            discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRC", emoji="🤝", value="affiliation"),
+            discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRG", emoji="🤝", value="affiliation"),
         ]
         super().__init__(placeholder="Select a ticket category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
 
@@ -247,7 +247,7 @@ class TicketModal(discord.ui.Modal):
         embed = discord.Embed(
             title=f"Support Ticket — {interaction.user.display_name}",
             description=f"**Category:** {self.title}\n**Reason:**\n{self.reason.value}",
-            color=discord.Color.blue()
+            color=discord.Color.from_rgb(46, 204, 113)
         )
         embed.set_footer(text="Greenville Roleplay Globe • Support System")
 
@@ -481,18 +481,18 @@ async def ticket_setup(interaction: discord.Interaction, channel: discord.TextCh
     await interaction.response.defer(ephemeral=True)
     try:
         embed = discord.Embed(
-            title="GVRC Support",
+            title="GVRG Support",
             description=(
-                "**Welcome to the Greenville Roleplay Central Support Center.** To receive assistance, please open a formal support ticket "
+                "**Welcome to the Greenville Roleplay Globe Support Center.** To receive assistance, please open a formal support ticket "
                 "within this channel; our staff team aims to address all inquiries efficiently, with response times prioritized according to the "
                 "nature and urgency of the request. Please be advised that any misuse or abuse of this system will result in a permanent "
                 "blacklist from our support services. Additionally, ensure you remain active within your request, as tickets will be closed "
                 "automatically if no response is received within 12 hours.\n\n"
                 "**General Support** - For any random, questions or enquiries or perk requests.\n\n"
                 "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
-                "**Affiliation Request** - Request a partnership with GVRC."
+                "**Affiliation Request** - Request a partnership with GVRG."
             ),
-            color=discord.Color.from_rgb(40, 45, 55)
+            color=discord.Color.from_rgb(46, 204, 113)
         )
         if image_url:
             embed.set_image(url=image_url)
