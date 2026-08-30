@@ -247,7 +247,7 @@ class TicketModal(discord.ui.Modal):
         self.add_item(self.reason)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Defer immediately to prevent interaction timeout errors
+        # Acknowledge the interaction immediately to prevent the 3-second timeout error for all categories
         await interaction.response.defer(ephemeral=True)
         
         guild = interaction.guild
@@ -496,6 +496,40 @@ async def app_open(interaction: discord.Interaction):
         color=discord.Color.green()
     )
     await interaction.followup.send(embed=embed)
+
+@staff_group.command(name="report-setup", description="Post the support ticket panel in the staff report channel")
+@app_commands.describe(
+    channel="The channel to send the ticket panel in",
+    image_url="The image URL for the support banner"
+)
+async def staff_report_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        embed = discord.Embed(
+            title="GVRG Support Center",
+            description=(
+                "**Welcome to the Greenville Roleplay Globe Support Center.** To receive assistance, please open a formal support ticket "
+                "using the menu below; our staff team aims to address all inquiries efficiently.\n\n"
+                "**General Support** - For any random questions, enquiries, or perk requests.\n\n"
+                "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
+                "**Affiliation Request** - Request a partnership with GVRG."
+            ),
+            color=discord.Color.from_rgb(46, 204, 113)
+        )
+        if image_url:
+            embed.set_image(url=image_url)
+
+        view = TicketView()
+        await channel.send(embed=embed, view=view)
+        await interaction.followup.send(
+            f"Ticket panel successfully sent to {channel.mention}!",
+            ephemeral=True,
+        )
+    except Exception:
+        await interaction.followup.send(
+            f"Failed to send ticket panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
+            ephemeral=True,
+        )
 
 # --- TICKET COMMANDS ---
 @ticket_group.command(name="setup", description="Post the exact support ticket panel")
