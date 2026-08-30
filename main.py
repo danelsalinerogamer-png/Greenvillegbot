@@ -397,7 +397,7 @@ async def session_vote(interaction: discord.Interaction, min_reacts: int = None,
         desc += f"\n\n📌 **Minimum Reacts Needed:** {min_reacts}"
 
     embed = discord.Embed(title="🚗 GVRG Session Attendance Vote", description=desc, color=discord.Color.green())
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540780344620490752/image0.jpg")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1541884506670235648/1543711150951243977/848CAC68-083E-40EC-AD90-444EF6D85179.jpg?ex=6a95dc8b&is=6a948b0b&hm=be017e19af165d0a1877fe73a832ecf17b31673b547c0fe42bc4d371d69ec416&")
     await interaction.followup.send(embed=embed)
     session_vote_msg = await interaction.original_response()
     await session_vote_msg.add_reaction("✅")
@@ -422,14 +422,14 @@ async def session_start(interaction: discord.Interaction, link: str = None, frp_
         desc += f"\n\n🔗 **Join Link:** {link}"
 
     embed = discord.Embed(title="🟢 GVRG Session Started", description=desc, color=discord.Color.green())
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540781020377391125/image0.jpg")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1541884506670235648/1543711151194509443/1627CD46-D54F-4288-9021-CC7556548EA5.jpg?ex=6a95dc8b&is=6a948b0b&hm=4151f4f7bd8131b961d46de06fec3e57238c4d0fdaf67acf9c88ab431283dc87&")
     await interaction.followup.send(embed=embed)
 
 @session_group.command(name="end", description="Announce session termination")
 async def session_end(interaction: discord.Interaction):
     await interaction.response.defer()
     embed = discord.Embed(title="🔴 GVRG Session Ended", description="The GVRG roleplay session has concluded.", color=discord.Color.red())
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540781434107732018/image0.jpg")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1541884506670235648/1543711151429525595/291FB6F1-6FDB-4841-A1B8-4D8CEE642B1A.jpg?ex=6a95dc8b&is=6a948b0b&hm=b47767a9a2f889e5e3334ba4c783ca8fc36decae628e2bc6a59c17c424119aec&")
     end_msg = await interaction.followup.send(embed=embed, wait=True)
     await asyncio.sleep(3600)
     try:
