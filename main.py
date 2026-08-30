@@ -468,7 +468,16 @@ async def app_open(interaction: discord.Interaction):
 @staff_group.command(name="report-setup", description="Post ticket panel")
 async def staff_report_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
-    embed = discord.Embed(title="GVRG Support Center", description="Select a ticket category below.", color=discord.Color.from_rgb(46, 204, 113))
+    
+    # Updated main panel embed description mirroring your layout example with definitions
+    panel_desc = (
+        "**Welcome to the GVRG Support Center.** To receive assistance, please open a formal support ticket within this channel; our staff team aims to address all inquiries efficiently.\n\n"
+        "**General Support** - For any random questions, enquiries, or perk requests.\n"
+        "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n"
+        "**Affiliation Request** - Request a partnership with GVRG."
+    )
+    
+    embed = discord.Embed(title="GVRG Support", description=panel_desc, color=discord.Color.from_rgb(46, 204, 113))
     if image_url: embed.set_image(url=image_url)
     await channel.send(embed=embed, view=TicketView())
     await interaction.followup.send("Sent!", ephemeral=True)
@@ -477,7 +486,15 @@ async def staff_report_setup(interaction: discord.Interaction, channel: discord.
 @ticket_group.command(name="setup", description="Post support ticket panel")
 async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
-    embed = discord.Embed(title="GVRG Support Center", description="Select a ticket category below.", color=discord.Color.from_rgb(46, 204, 113))
+    
+    panel_desc = (
+        "**Welcome to the GVRG Support Center.** To receive assistance, please open a formal support ticket within this channel; our staff team aims to address all inquiries efficiently.\n\n"
+        "**General Support** - For any random questions, enquiries, or perk requests.\n"
+        "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n"
+        "**Affiliation Request** - Request a partnership with GVRG."
+    )
+
+    embed = discord.Embed(title="GVRG Support", description=panel_desc, color=discord.Color.from_rgb(46, 204, 113))
     if image_url: embed.set_image(url=image_url)
     await channel.send(embed=embed, view=TicketView())
     await interaction.followup.send("Sent!", ephemeral=True)
