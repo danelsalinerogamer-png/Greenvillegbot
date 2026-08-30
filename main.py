@@ -43,6 +43,14 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+def get_next_ticket_number():
+    data = load_data()
+    # Keep track of ticket counter inside json database
+    current_count = data.get("ticket_counter", 0) + 1
+    data["ticket_counter"] = current_count
+    save_data(data)
+    return current_count
+
 def format_seconds(seconds):
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
@@ -203,7 +211,7 @@ class VerifyView(discord.ui.View):
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="General Support", description="For any random, questions or enquiries or perk requests", emoji="❓", value="general"),
+            discord.SelectOption(label="General Support", description="For any random questions, enquiries, or perk requests", emoji="❓", value="general"),
             discord.SelectOption(label="Staff Report", description="Feel like a staff member has treated you unfairly?", emoji="⚠️", value="staff_report"),
             discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRG", emoji="🤝", value="affiliation"),
         ]
@@ -223,8 +231,15 @@ class TicketModal(discord.ui.Modal):
         super().__init__(title=title)
         self.category = category
 
+        # Tailor placeholder/label slightly depending on category
+        label_text = "Please describe your issue or request"
+        if category == "affiliation":
+            label_text = "Provide Server Name, Member Count, & Partnership Info"
+        elif category == "staff_report":
+            label_text = "Provide staff member name and evidence description"
+
         self.reason = discord.ui.TextInput(
-            label="Please describe your issue or request",
+            label=label_text,
             style=discord.TextStyle.paragraph,
             placeholder="Type your details here...",
             required=True,
@@ -241,15 +256,22 @@ class TicketModal(discord.ui.Modal):
             interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
         }
 
-        channel_name = f"ticket-{interaction.user.name}-{self.category}"
+        # Auto-incrementing unique ticket number
+        ticket_num = get_next_ticket_number()
+        channel_name = f"ticket-{ticket_num}"
         ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
 
         embed = discord.Embed(
-            title=f"Support Ticket — {interaction.user.display_name}",
-            description=f"**Category:** {self.title}\n**Status:** Unclaimed\n**Reason:**\n{self.reason.value}",
+            title=f"GVRG Support — Ticket #{ticket_num}",
+            description=(
+                f"**Category:** {self.title}\n"
+                f"**Author:** {interaction.user.mention}\n"
+                f"**Status:** Unclaimed\n\n"
+                f"**Description / Details:**\n{self.reason.value}"
+            ),
             color=discord.Color.from_rgb(46, 204, 113)
         )
-        embed.set_footer(text="Greenville Roleplay Globe • Support System")
+        embed.set_footer(text="Greenville Roleplay Globe (GVRG) • Support System")
 
         close_view = TicketCloseView()
         await ticket_channel.send(content=f"{interaction.user.mention} Staff will be with you shortly.", embed=embed, view=close_view)
@@ -261,11 +283,7 @@ class TicketCloseView(discord.ui.View):
 
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.success, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
     async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Optional: Add a check here if you only want staff to claim (e.g. check for a staff role ID)
-        
-        # Update embed description to show claimed status
         embed = interaction.message.embeds[0]
-        # Replace or update status line in description
         desc_lines = embed.description.split("\n")
         new_desc_lines = []
         for line in desc_lines:
@@ -274,13 +292,11 @@ class TicketCloseView(discord.ui.View):
             else:
                 new_desc_lines.append(line)
         
-        # If Status wasn't explicitly found, insert it
         if not any(line.startswith("**Status:**") for line in desc_lines):
-            new_desc_lines.insert(1, f"**Status:** Claimed by {interaction.user.mention}")
+            new_desc_lines.insert(2, f"**Status:** Claimed by {interaction.user.mention}")
 
         embed.description = "\n".join(new_desc_lines)
         
-        # Disable the claim button after it's clicked
         button.disabled = True
         button.label = f"Claimed by {interaction.user.display_name}"
         
@@ -324,7 +340,7 @@ async def session_vote(interaction: discord.Interaction, min_reacts: int = None,
         desc += f"\n\n📌 **Minimum Reacts Needed:** {min_reacts}"
 
     embed = discord.Embed(
-        title="🚗 Session Attendance Vote",
+        title="🚗 GVRG Session Attendance Vote",
         description=desc,
         color=discord.Color.green()
     )
@@ -350,14 +366,14 @@ async def session_start(interaction: discord.Interaction, link: str = None, frp_
             pass
         session_vote_msg = None
 
-    desc = description if description else "The roleplay session is now **ACTIVE**! Jump in-game."
+    desc = description if description else "The GVRG roleplay session is now **ACTIVE**! Jump in-game."
     if frp_limit:
         desc += f"\n\n⚡ **FRP Limit:** {frp_limit}"
     if link:
         desc += f"\n\n🔗 **Join Link:** {link}"
 
     embed = discord.Embed(
-        title="🟢 Session Started",
+        title="🟢 GVRG Session Started",
         description=desc,
         color=discord.Color.green()
     )
@@ -368,8 +384,8 @@ async def session_start(interaction: discord.Interaction, link: str = None, frp_
 async def session_end(interaction: discord.Interaction):
     await interaction.response.defer()
     embed = discord.Embed(
-        title="🔴 Session Ended",
-        description="The roleplay session has officially concluded. Thank you for participating!",
+        title="🔴 GVRG Session Ended",
+        description="The GVRG roleplay session has officially concluded. Thank you for participating!",
         color=discord.Color.red()
     )
     embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540781434107732018/image0.jpg")
@@ -398,9 +414,9 @@ async def shift_leaderboard(interaction: discord.Interaction):
         await interaction.followup.send("No shift data recorded yet!", ephemeral=True)
         return
 
-    sorted_users = sorted(data.items(), key=lambda x: x[1].get("total_seconds", 0), reverse=True)
+    sorted_users = sorted([item for item in data.items() if item[0] != "ticket_counter"], key=lambda x: x[1].get("total_seconds", 0), reverse=True)
 
-    embed = discord.Embed(title="🏆 Staff Shift Leaderboard", color=discord.Color.gold())
+    embed = discord.Embed(title="🏆 GVRG Staff Shift Leaderboard", color=discord.Color.gold())
     description = ""
 
     for rank, (uid, stats) in enumerate(sorted_users[:10], start=1):
@@ -433,7 +449,7 @@ async def verify_startup(interaction: discord.Interaction, channel: discord.Text
     await interaction.response.defer(ephemeral=True)
     try:
         embed = discord.Embed(
-            title="🔒 Server Verification",
+            title="🔒 GVRG Server Verification",
             description="Click the **Verify** button below to remove your unverified status and get access to **Greenville Roleplay Globe**!",
             color=discord.Color.green()
         )
@@ -456,7 +472,7 @@ async def verify_startup(interaction: discord.Interaction, channel: discord.Text
 async def app_closed(interaction: discord.Interaction):
     await interaction.response.defer()
     embed = discord.Embed(
-        title="🔒 Staff Applications — Closed",
+        title="🔒 GVRG Staff Applications — Closed",
         description=(
             "Staff applications for **Greenville Roleplay Globe** are currently **CLOSED**.\n\n"
             "If you have already applied and haven't received a response yet, your application is currently **under review**. "
@@ -471,7 +487,7 @@ async def app_closed(interaction: discord.Interaction):
 async def app_open(interaction: discord.Interaction):
     await interaction.response.defer()
     embed = discord.Embed(
-        title="🟢 Staff Applications — NOW OPEN!",
+        title="🟢 GVRG Staff Applications — NOW OPEN!",
         description=(
             "Staff applications for **Greenville Roleplay Globe** are officially **OPEN**!\n\n"
             "We are looking for active and dedicated members to join our staff team. Please read all questions carefully and fill out the form honestly and thoroughly.\n\n"
@@ -481,42 +497,21 @@ async def app_open(interaction: discord.Interaction):
     )
     await interaction.followup.send(embed=embed)
 
-@staff_group.command(name="verify-setup", description="Post the persistent verification panel")
-@app_commands.describe(channel="The channel to send the verification embed in")
-async def verify_setup(interaction: discord.Interaction, channel: discord.TextChannel):
-    await interaction.response.defer(ephemeral=True)
-    embed = discord.Embed(
-        title="🔒 Server Verification",
-        description="Click the **Verify** button below to unlock access to **Greenville Roleplay Globe**!",
-        color=discord.Color.green()
-    )
-    embed.set_footer(text="Greenville Roleplay Globe • Security")
-
-    view = VerifyView()
-    await channel.send(embed=embed, view=view)
-    await interaction.followup.send(
-        f"Verification panel successfully sent to {channel.mention}!",
-        ephemeral=True,
-    )
-
 # --- TICKET COMMANDS ---
 @ticket_group.command(name="setup", description="Post the exact support ticket panel")
 @app_commands.describe(
     channel="The channel to send the ticket panel in",
     image_url="The image URL for the support banner"
 )
-async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str):
+async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
     try:
         embed = discord.Embed(
-            title="GVRG Support",
+            title="GVRG Support Center",
             description=(
                 "**Welcome to the Greenville Roleplay Globe Support Center.** To receive assistance, please open a formal support ticket "
-                "within this channel; our staff team aims to address all inquiries efficiently, with response times prioritized according to the "
-                "nature and urgency of the request. Please be advised that any misuse or abuse of this system will result in a permanent "
-                "blacklist from our support services. Additionally, ensure you remain active within your request, as tickets will be closed "
-                "automatically if no response is received within 12 hours.\n\n"
-                "**General Support** - For any random, questions or enquiries or perk requests.\n\n"
+                "using the menu below; our staff team aims to address all inquiries efficiently.\n\n"
+                "**General Support** - For any random questions, enquiries, or perk requests.\n\n"
                 "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
                 "**Affiliation Request** - Request a partnership with GVRG."
             ),
@@ -543,7 +538,7 @@ async def ticket_setup(interaction: discord.Interaction, channel: discord.TextCh
 async def app_passed(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
     embed = discord.Embed(
-        title="🎉 Staff Application Passed!",
+        title="🎉 GVRG Staff Application Passed!",
         description=(
             f"Congratulations {user.mention}! Your application for the **Greenville Roleplay Globe** "
             "staff team has been **ACCEPTED**.\n\n"
@@ -560,7 +555,7 @@ async def app_passed(interaction: discord.Interaction, user: discord.Member):
 async def app_denied(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
     embed = discord.Embed(
-        title="❌ Staff Application Denied",
+        title="❌ GVRG Staff Application Denied",
         description=(
             f"Thank you for your interest in joining our staff team, {user.mention}.\n\n"
             "Unfortunately, your staff application has been **DENIED** at this time. "
@@ -570,33 +565,6 @@ async def app_denied(interaction: discord.Interaction, user: discord.Member):
     )
     embed.set_thumbnail(url=user.display_avatar.url)
     embed.set_footer(text="Greenville Roleplay Globe • Staff Team")
-    await interaction.followup.send(embed=embed)
-
-# --- STANDALONE COMMANDS ---
-@bot.tree.command(name="promote", description="Announce a staff or member promotion")
-@app_commands.describe(user="The user being promoted", old_rank="Their current rank", new_rank="Their new rank", reason="Reason for promotion")
-async def promote(interaction: discord.Interaction, user: discord.Member, old_rank: str, new_rank: str, reason: str = "Hard work and dedication"):
-    await interaction.response.defer()
-    embed = discord.Embed(title="🎉 Staff Promotion!", description=f"Congratulations to {user.mention} on their promotion!", color=discord.Color.green())
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👤 User", value=f"{user.mention}", inline=True)
-    embed.add_field(name="📉 Previous Rank", value=old_rank, inline=True)
-    embed.add_field(name="📈 New Rank", value=f"**{new_rank}**", inline=True)
-    embed.add_field(name="📝 Reason", value=reason, inline=False)
-    embed.set_footer(text="Greenville Roleplay Globe • Management")
-    await interaction.followup.send(embed=embed)
-
-@bot.tree.command(name="demote", description="Announce a staff or member demotion")
-@app_commands.describe(user="The user being demoted", old_rank="Their current rank", new_rank="Their new rank", reason="Reason for demotion")
-async def demote(interaction: discord.Interaction, user: discord.Member, old_rank: str, new_rank: str, reason: str = "No reason provided"):
-    await interaction.response.defer()
-    embed = discord.Embed(title="📉 Staff Demotion", description=f"A rank update has been issued for {user.mention}.", color=discord.Color.red())
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👤 User", value=f"{user.mention}", inline=True)
-    embed.add_field(name="📈 Previous Rank", value=old_rank, inline=True)
-    embed.add_field(name="📉 New Rank", value=f"**{new_rank}**", inline=True)
-    embed.add_field(name="📝 Reason", value=reason, inline=False)
-    embed.set_footer(text="Greenville Roleplay Globe • Management")
     await interaction.followup.send(embed=embed)
 
 # --- REGISTER COMMAND GROUPS TO BOT.TREE ---
