@@ -24,10 +24,9 @@ def keep_alive():
 
 # --- BOT SETUP ---
 intents = discord.Intents.default()
-intents.members = True  # Required for fetching/managing members
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Track session vote message object to delete later
 session_vote_msg = None
 
 # --- DATABASE / STORAGE SETUP ---
@@ -186,7 +185,7 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        CIVILIAN_ROLE_ID = 1537473046158246021  # Your Civilian role ID
+        CIVILIAN_ROLE_ID = 1537473046158246021
 
         civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
         unverified_role = discord.utils.get(interaction.guild.roles, name="Unverified")
@@ -202,81 +201,29 @@ class VerifyView(discord.ui.View):
             if unverified_role and unverified_role in interaction.user.roles:
                 await interaction.user.remove_roles(unverified_role)
                 
-            await interaction.response.send_message("🎉 You have been successfully verified! Unverified role removed, Civilian role added.", ephemeral=True)
+            await interaction.response.send_message("🎉 You have been successfully verified!", ephemeral=True)
         except Exception:
-            await interaction.response.send_message("Failed to update roles. Make sure the bot's role is higher than the roles it is trying to assign!", ephemeral=True)
+            await interaction.response.send_message("Failed to update roles. Make sure bot role is high enough!", ephemeral=True)
 
-# --- TICKET DROPDOWN VIEW & MODAL ---
-class TicketSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="General Support", description="For any random questions, enquiries, or perk requests", emoji="❓", value="general"),
-            discord.SelectOption(label="Staff Report", description="Feel like a staff member has treated you unfairly?", emoji="⚠️", value="staff_report"),
-            discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRG", emoji="🤝", value="affiliation"),
-        ]
-        super().__init__(placeholder="Select a ticket category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
-
-    async def callback(self, interaction: discord.Interaction):
-        category_name = self.values[0]
-        titles = {
-            "general": "General Support Ticket",
-            "staff_report": "Staff Report Ticket",
-            "affiliation": "Affiliation Request Ticket"
-        }
-        # Instantly open the modal to prevent any 3-second timeout errors
-        await interaction.response.send_modal(TicketModal(title=titles[category_name], category=category_name))
-
-class TicketModal(discord.ui.Modal):
-    def __init__(self, title: str, category: str):
-        super().__init__(title=title)
-        self.category = category
-
-        label_text = "Please describe your issue or request"
-        if category == "affiliation":
-            label_text = "Provide Server Name, Member Count, & Partnership Info"
-        elif category == "staff_report":
-            label_text = "Provide staff member name and evidence description"
-
-        self.reason = discord.ui.TextInput(
-            label=label_text,
-            style=discord.TextStyle.paragraph,
-            placeholder="Type your details here...",
-            required=True,
-            max_length=1000
-        )
-        self.add_item(self.reason)
+# --- TICKET CLOSE REASON MODAL ---
+class CloseReasonModal(discord.ui.Modal, title="Close Ticket with Reason"):
+    reason = discord.ui.TextInput(
+        label="Reason for closing",
+        style=discord.TextStyle.paragraph,
+        placeholder="Type why this ticket is being closed...",
+        required=True,
+        max_length=500
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Defer immediately since creating channels can take time
-        await interaction.response.defer(ephemeral=True)
-        
-        guild = interaction.guild
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-        }
+        await interaction.response.send_message(f"🔒 Ticket closing with reason: **{self.reason.value}**", ephemeral=False)
+        await asyncio.sleep(4)
+        try:
+            await interaction.channel.delete()
+        except Exception:
+            pass
 
-        # Auto-incrementing unique ticket number
-        ticket_num = get_next_ticket_number()
-        channel_name = f"ticket-{ticket_num}"
-        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
-
-        embed = discord.Embed(
-            title=f"GVRG Support — Ticket #{ticket_num}",
-            description=(
-                f"**Category:** {self.title}\n"
-                f"**Author:** {interaction.user.mention}\n"
-                f"**Status:** Unclaimed\n\n"
-                f"**Description / Details:**\n{self.reason.value}"
-            ),
-            color=discord.Color.from_rgb(46, 204, 113)
-        )
-        embed.set_footer(text="Greenville Roleplay Globe (GVRG) • Support System")
-
-        close_view = TicketCloseView()
-        await ticket_channel.send(content=f"{interaction.user.mention} Staff will be with you shortly.", embed=embed, view=close_view)
-        await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
-
+# --- TICKET CLOSE VIEW ---
 class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -303,7 +250,7 @@ class TicketCloseView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"🔒 This ticket has been claimed by {interaction.user.mention}.", ephemeral=False)
 
-    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=True)
         await asyncio.sleep(5)
@@ -311,6 +258,78 @@ class TicketCloseView(discord.ui.View):
             await interaction.channel.delete()
         except Exception:
             pass
+
+    @discord.ui.button(label="Close with Reason", style=discord.ButtonStyle.danger, emoji="📝", custom_id="close_reason_ticket_btn")
+    async def close_reason_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(CloseReasonModal())
+
+# --- TICKET DROPDOWN & MODAL ---
+class TicketSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="General Support", description="For any random questions, enquiries, or perk requests", emoji="❓", value="general"),
+            discord.SelectOption(label="Staff Report", description="Feel like a staff member has treated you unfairly?", emoji="⚠️", value="staff_report"),
+            discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRG", emoji="🤝", value="affiliation"),
+        ]
+        super().__init__(placeholder="Select a ticket category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
+
+    async def callback(self, interaction: discord.Interaction):
+        category_name = self.values[0]
+        titles = {
+            "general": "General Support Ticket",
+            "staff_report": "Staff Report Ticket",
+            "affiliation": "Affiliation Request Ticket"
+        }
+        await interaction.response.send_modal(TicketModal(title=titles[category_name], category=category_name))
+
+class TicketModal(discord.ui.Modal):
+    def __init__(self, title: str, category: str):
+        super().__init__(title=title)
+        self.category = category
+
+        label_text = "Please describe your issue or request"
+        if category == "affiliation":
+            label_text = "Provide Server Name, Member Count, & Partnership Info"
+        elif category == "staff_report":
+            label_text = "Provide staff member name and evidence description"
+
+        self.reason = discord.ui.TextInput(
+            label=label_text,
+            style=discord.TextStyle.paragraph,
+            placeholder="Type your details here...",
+            required=True,
+            max_length=1000
+        )
+        self.add_item(self.reason)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+        }
+
+        ticket_num = get_next_ticket_number()
+        channel_name = f"ticket-{ticket_num}"
+        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+
+        embed = discord.Embed(
+            title=f"GVRG Support — Ticket #{ticket_num}",
+            description=(
+                f"**Category:** {self.title}\n"
+                f"**Author:** {interaction.user.mention}\n"
+                f"**Status:** Unclaimed\n\n"
+                f"**Description / Details:**\n{self.reason.value}"
+            ),
+            color=discord.Color.from_rgb(46, 204, 113)
+        )
+        embed.set_footer(text="Greenville Roleplay Globe (GVRG) • Support System")
+
+        close_view = TicketCloseView()
+        await ticket_channel.send(content=f"{interaction.user.mention} Staff will be with you shortly.", embed=embed, view=close_view)
+        await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
 
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -327,10 +346,7 @@ ticket_group = app_commands.Group(name="ticket", description="Ticket system mana
 
 # --- SESSION COMMANDS ---
 @session_group.command(name="vote", description="Start a session attendance vote")
-@app_commands.describe(
-    min_reacts="Minimum reactions required for session to start",
-    description="Optional description or details for the vote"
-)
+@app_commands.describe(min_reacts="Minimum reactions required", description="Optional description")
 async def session_vote(interaction: discord.Interaction, min_reacts: int = None, description: str = None):
     await interaction.response.defer()
     global session_vote_msg
@@ -339,11 +355,7 @@ async def session_vote(interaction: discord.Interaction, min_reacts: int = None,
     if min_reacts:
         desc += f"\n\n📌 **Minimum Reacts Needed:** {min_reacts}"
 
-    embed = discord.Embed(
-        title="🚗 GVRG Session Attendance Vote",
-        description=desc,
-        color=discord.Color.green()
-    )
+    embed = discord.Embed(title="🚗 GVRG Session Attendance Vote", description=desc, color=discord.Color.green())
     embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540780344620490752/image0.jpg")
     await interaction.followup.send(embed=embed)
     session_vote_msg = await interaction.original_response()
@@ -351,11 +363,7 @@ async def session_vote(interaction: discord.Interaction, min_reacts: int = None,
     await session_vote_msg.add_reaction("❌")
 
 @session_group.command(name="start", description="Announce the start of a session")
-@app_commands.describe(
-    link="Optional server link to join directly",
-    frp_limit="Optional FRP speed limit or rule setup",
-    description="Optional extra details for the session start"
-)
+@app_commands.describe(link="Server link", frp_limit="FRP speed limit", description="Extra details")
 async def session_start(interaction: discord.Interaction, link: str = None, frp_limit: str = None, description: str = None):
     await interaction.response.defer()
     global session_vote_msg
@@ -372,25 +380,16 @@ async def session_start(interaction: discord.Interaction, link: str = None, frp_
     if link:
         desc += f"\n\n🔗 **Join Link:** {link}"
 
-    embed = discord.Embed(
-        title="🟢 GVRG Session Started",
-        description=desc,
-        color=discord.Color.green()
-    )
+    embed = discord.Embed(title="🟢 GVRG Session Started", description=desc, color=discord.Color.green())
     embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540781020377391125/image0.jpg")
     await interaction.followup.send(embed=embed)
 
 @session_group.command(name="end", description="Announce session termination")
 async def session_end(interaction: discord.Interaction):
     await interaction.response.defer()
-    embed = discord.Embed(
-        title="🔴 GVRG Session Ended",
-        description="The GVRG roleplay session has officially concluded. Thank you for participating!",
-        color=discord.Color.red()
-    )
+    embed = discord.Embed(title="🔴 GVRG Session Ended", description="The GVRG roleplay session has concluded.", color=discord.Color.red())
     embed.set_image(url="https://cdn.discordapp.com/attachments/1539991169231228938/1540781434107732018/image0.jpg")
     end_msg = await interaction.followup.send(embed=embed, wait=True)
-
     await asyncio.sleep(3600)
     try:
         await end_msg.delete()
@@ -398,7 +397,7 @@ async def session_end(interaction: discord.Interaction):
         pass
 
 # --- SHIFT COMMANDS ---
-@shift_group.command(name="manage", description="Open your shift management panel")
+@shift_group.command(name="manage", description="Open your shift panel")
 async def shift_manage(interaction: discord.Interaction):
     await interaction.response.defer()
     view = ShiftView()
@@ -406,7 +405,7 @@ async def shift_manage(interaction: discord.Interaction):
     embed = view.build_embed(interaction.user, stats)
     await interaction.followup.send(embed=embed, view=view)
 
-@shift_group.command(name="leaderboard", description="View the staff shift duration leaderboard")
+@shift_group.command(name="leaderboard", description="View shift leaderboard")
 async def shift_leaderboard(interaction: discord.Interaction):
     await interaction.response.defer()
     data = load_data()
@@ -415,193 +414,69 @@ async def shift_leaderboard(interaction: discord.Interaction):
         return
 
     sorted_users = sorted([item for item in data.items() if item[0] != "ticket_counter"], key=lambda x: x[1].get("total_seconds", 0), reverse=True)
-
     embed = discord.Embed(title="🏆 GVRG Staff Shift Leaderboard", color=discord.Color.gold())
     description = ""
 
     for rank, (uid, stats) in enumerate(sorted_users[:10], start=1):
-        user = interaction.guild.get_member(int(uid))
-        if user is None:
-            try:
-                user = await interaction.guild.fetch_member(int(uid))
-            except (discord.NotFound, discord.HTTPException):
-                try:
-                    user = await bot.fetch_user(int(uid))
-                except (discord.NotFound, discord.HTTPException):
-                    user = None
-
-        if isinstance(user, discord.Member):
-            name = user.display_name
-        elif user is not None:
-            name = user.name
-        else:
-            name = f"User ID: {uid}"
-        time_str = format_seconds(stats.get("total_seconds", 0))
-        description += f"**#{rank} {name}** — {time_str} ({stats.get('shift_count', 0)} shifts)\n"
+        user = interaction.guild.get_member(int(uid)) or await bot.fetch_user(int(uid))
+        name = user.display_name if isinstance(user, discord.Member) else (user.name if user else f"User ID: {uid}")
+        description += f"**#{rank} {name}** — {format_seconds(stats.get('total_seconds', 0))} ({stats.get('shift_count', 0)} shifts)\n"
 
     embed.description = description or "No data available."
     await interaction.followup.send(embed=embed)
 
 # --- VERIFY COMMANDS ---
-@verify_group.command(name="startup", description="Post the verification panel button")
-@app_commands.describe(channel="The channel to send the verification embed in")
+@verify_group.command(name="startup", description="Post verification panel")
 async def verify_startup(interaction: discord.Interaction, channel: discord.TextChannel):
     await interaction.response.defer(ephemeral=True)
-    try:
-        embed = discord.Embed(
-            title="🔒 GVRG Server Verification",
-            description="Click the **Verify** button below to remove your unverified status and get access to **Greenville Roleplay Globe**!",
-            color=discord.Color.green()
-        )
-        embed.set_footer(text="Greenville Roleplay Globe • Security")
-
-        view = VerifyView()
-        await channel.send(embed=embed, view=view)
-        await interaction.followup.send(
-            f"Verification panel successfully sent to {channel.mention}!",
-            ephemeral=True,
-        )
-    except Exception:
-        await interaction.followup.send(
-            f"Failed to send panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
-            ephemeral=True,
-        )
+    embed = discord.Embed(title="🔒 GVRG Server Verification", description="Click **Verify** below!", color=discord.Color.green())
+    await channel.send(embed=embed, view=VerifyView())
+    await interaction.followup.send("Sent!", ephemeral=True)
 
 # --- STAFF COMMANDS ---
-@staff_group.command(name="app-closed", description="Post closed/under review applications embed")
+@staff_group.command(name="app-closed", description="Post closed applications")
 async def app_closed(interaction: discord.Interaction):
     await interaction.response.defer()
-    embed = discord.Embed(
-        title="🔒 GVRG Staff Applications — Closed",
-        description=(
-            "Staff applications for **Greenville Roleplay Globe** are currently **CLOSED**.\n\n"
-            "If you have already applied and haven't received a response yet, your application is currently **under review**. "
-            "Results will be published in a couple of days in the staff announcements channel.\n\n"
-            "Thank you for your patience!"
-        ),
-        color=discord.Color.red()
-    )
+    embed = discord.Embed(title="🔒 GVRG Staff Applications — Closed", description="Applications are closed.", color=discord.Color.red())
     await interaction.followup.send(embed=embed)
 
-@staff_group.command(name="app-open", description="Post open applications embed with form link")
+@staff_group.command(name="app-open", description="Post open applications")
 async def app_open(interaction: discord.Interaction):
     await interaction.response.defer()
-    embed = discord.Embed(
-        title="🟢 GVRG Staff Applications — NOW OPEN!",
-        description=(
-            "Staff applications for **Greenville Roleplay Globe** are officially **OPEN**!\n\n"
-            "We are looking for active and dedicated members to join our staff team. Please read all questions carefully and fill out the form honestly and thoroughly.\n\n"
-            "👉 [Click Here to Apply](https://docs.google.com/forms/d/e/1FAIpQLSdCvSvHve1pLQLv4pjkmONYNbbhuWwOi_9h-Dn1Jnnrvg0Jg/viewform?usp=dialog)"
-        ),
-        color=discord.Color.green()
-    )
+    embed = discord.Embed(title="🟢 GVRG Staff Applications — OPEN!", description="[Apply Here](https://docs.google.com/forms/)", color=discord.Color.green())
     await interaction.followup.send(embed=embed)
 
-@staff_group.command(name="report-setup", description="Post the support ticket panel in the staff report channel")
-@app_commands.describe(
-    channel="The channel to send the ticket panel in",
-    image_url="The image URL for the support banner"
-)
+@staff_group.command(name="report-setup", description="Post ticket panel")
 async def staff_report_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
-    try:
-        embed = discord.Embed(
-            title="GVRG Support Center",
-            description=(
-                "**Welcome to the Greenville Roleplay Globe Support Center.** To receive assistance, please open a formal support ticket "
-                "using the menu below; our staff team aims to address all inquiries efficiently.\n\n"
-                "**General Support** - For any random questions, enquiries, or perk requests.\n\n"
-                "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
-                "**Affiliation Request** - Request a partnership with GVRG."
-            ),
-            color=discord.Color.from_rgb(46, 204, 113)
-        )
-        if image_url:
-            embed.set_image(url=image_url)
-
-        view = TicketView()
-        await channel.send(embed=embed, view=view)
-        await interaction.followup.send(
-            f"Ticket panel successfully sent to {channel.mention}!",
-            ephemeral=True,
-        )
-    except Exception:
-        await interaction.followup.send(
-            f"Failed to send ticket panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
-            ephemeral=True,
-        )
+    embed = discord.Embed(title="GVRG Support Center", description="Select a ticket category below.", color=discord.Color.from_rgb(46, 204, 113))
+    if image_url: embed.set_image(url=image_url)
+    await channel.send(embed=embed, view=TicketView())
+    await interaction.followup.send("Sent!", ephemeral=True)
 
 # --- TICKET COMMANDS ---
-@ticket_group.command(name="setup", description="Post the exact support ticket panel")
-@app_commands.describe(
-    channel="The channel to send the ticket panel in",
-    image_url="The image URL for the support banner"
-)
+@ticket_group.command(name="setup", description="Post support ticket panel")
 async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
-    try:
-        embed = discord.Embed(
-            title="GVRG Support Center",
-            description=(
-                "**Welcome to the Greenville Roleplay Globe Support Center.** To receive assistance, please open a formal support ticket "
-                "using the menu below; our staff team aims to address all inquiries efficiently.\n\n"
-                "**General Support** - For any random questions, enquiries, or perk requests.\n\n"
-                "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
-                "**Affiliation Request** - Request a partnership with GVRG."
-            ),
-            color=discord.Color.from_rgb(46, 204, 113)
-        )
-        if image_url:
-            embed.set_image(url=image_url)
-
-        view = TicketView()
-        await channel.send(embed=embed, view=view)
-        await interaction.followup.send(
-            f"Ticket panel successfully sent to {channel.mention}!",
-            ephemeral=True,
-        )
-    except Exception:
-        await interaction.followup.send(
-            f"Failed to send ticket panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
-            ephemeral=True,
-        )
+    embed = discord.Embed(title="GVRG Support Center", description="Select a ticket category below.", color=discord.Color.from_rgb(46, 204, 113))
+    if image_url: embed.set_image(url=image_url)
+    await channel.send(embed=embed, view=TicketView())
+    await interaction.followup.send("Sent!", ephemeral=True)
 
 # --- APPLICATION COMMANDS ---
-@application_group.command(name="passed", description="Announce an accepted application")
-@app_commands.describe(user="The user who passed the application")
+@application_group.command(name="passed", description="Accept application")
 async def app_passed(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
-    embed = discord.Embed(
-        title="🎉 GVRG Staff Application Passed!",
-        description=(
-            f"Congratulations {user.mention}! Your application for the **Greenville Roleplay Globe** "
-            "staff team has been **ACCEPTED**.\n\n"
-            "Please check your direct messages or wait for High Management to ping you regarding onboarding."
-        ),
-        color=discord.Color.green()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text="Greenville Roleplay Globe • Staff Team")
+    embed = discord.Embed(title="🎉 Accepted!", description=f"Congrats {user.mention}!", color=discord.Color.green())
     await interaction.followup.send(embed=embed)
 
-@application_group.command(name="denied", description="Announce a denied application")
-@app_commands.describe(user="The user whose application was denied")
+@application_group.command(name="denied", description="Deny application")
 async def app_denied(interaction: discord.Interaction, user: discord.Member):
     await interaction.response.defer()
-    embed = discord.Embed(
-        title="❌ GVRG Staff Application Denied",
-        description=(
-            f"Thank you for your interest in joining our staff team, {user.mention}.\n\n"
-            "Unfortunately, your staff application has been **DENIED** at this time. "
-            "You are welcome to re-apply during our next open application cycle."
-        ),
-        color=discord.Color.red()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text="Greenville Roleplay Globe • Staff Team")
+    embed = discord.Embed(title="❌ Denied", description=f"Sorry {user.mention}.", color=discord.Color.red())
     await interaction.followup.send(embed=embed)
 
-# --- REGISTER COMMAND GROUPS TO BOT.TREE ---
+# --- REGISTER GROUPS ---
 bot.tree.add_command(session_group)
 bot.tree.add_command(shift_group)
 bot.tree.add_command(verify_group)
@@ -618,6 +493,5 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
-# Start the web server and run the bot
 keep_alive()
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
