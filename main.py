@@ -180,10 +180,9 @@ class VerifyView(discord.ui.View):
     @discord.ui.button(label="Verify", style=discord.ButtonStyle.success, emoji="✅", custom_id="persistent_verify:verify_btn")
     async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         CIVILIAN_ROLE_ID = 1537473046158246021  # Your Civilian role ID
-        UNVERIFIED_ROLE_ID = 1541806282036617289  # <--- REPLACE WITH YOUR UNVERIFIED ROLE ID IF APPLICABLE
 
         civilian_role = interaction.guild.get_role(CIVILIAN_ROLE_ID)
-        unverified_role = interaction.guild.get_role(UNVERIFIED_ROLE_ID) if UNVERIFIED_ROLE_ID != 0 else None
+        unverified_role = discord.utils.get(interaction.guild.roles, name="Unverified")
 
         if not civilian_role:
             await interaction.response.send_message("Civilian role not found! Please check the Role ID in code.", ephemeral=True)
@@ -200,12 +199,87 @@ class VerifyView(discord.ui.View):
         except Exception:
             await interaction.response.send_message("Failed to update roles. Make sure the bot's role is higher than the roles it is trying to assign!", ephemeral=True)
 
+# --- TICKET DROPDOWN VIEW & MODAL ---
+class TicketSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="General Support", description="For any random, questions or enquiries or perk requests", emoji="❓", value="general"),
+            discord.SelectOption(label="Staff Report", description="Feel like a staff member has treated you unfairly?", emoji="⚠️", value="staff_report"),
+            discord.SelectOption(label="Affiliation Request", description="Request a partnership with GVRC", emoji="🤝", value="affiliation"),
+        ]
+        super().__init__(placeholder="Select a ticket category...", min_values=1, max_values=1, options=options, custom_id="ticket_select_menu")
+
+    async def callback(self, interaction: discord.Interaction):
+        category_name = self.values[0]
+        titles = {
+            "general": "General Support Ticket",
+            "staff_report": "Staff Report Ticket",
+            "affiliation": "Affiliation Request Ticket"
+        }
+        await interaction.response.send_modal(TicketModal(title=titles[category_name], category=category_name))
+
+class TicketModal(discord.ui.Modal):
+    def __init__(self, title: str, category: str):
+        super().__init__(title=title)
+        self.category = category
+
+        self.reason = discord.ui.TextInput(
+            label="Please describe your issue or request",
+            style=discord.TextStyle.paragraph,
+            placeholder="Type your details here...",
+            required=True,
+            max_length=1000
+        )
+        self.add_item(self.reason)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+        }
+
+        channel_name = f"ticket-{interaction.user.name}-{self.category}"
+        ticket_channel = await guild.create_text_channel(name=channel_name, overwrites=overwrites)
+
+        embed = discord.Embed(
+            title=f"Support Ticket — {interaction.user.display_name}",
+            description=f"**Category:** {self.title}\n**Reason:**\n{self.reason.value}",
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Greenville Roleplay Globe • Support System")
+
+        close_view = TicketCloseView()
+        await ticket_channel.send(content=f"{interaction.user.mention} Staff will be with you shortly.", embed=embed, view=close_view)
+        await interaction.followup.send(f"Your ticket has been created! Head over to {ticket_channel.mention}.", ephemeral=True)
+
+class TicketCloseView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=True)
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete()
+        except Exception:
+            pass
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
 # --- SLASH COMMAND GROUPS ---
 session_group = app_commands.Group(name="session", description="Manage roleplay sessions")
 shift_group = app_commands.Group(name="shift", description="Manage staff shifts")
 staff_group = app_commands.Group(name="staff", description="Staff management commands")
 verify_group = app_commands.Group(name="verify", description="Verification commands")
 application_group = app_commands.Group(name="application", description="Application management commands")
+ticket_group = app_commands.Group(name="ticket", description="Ticket system management commands")
 
 # --- SESSION COMMANDS ---
 @session_group.command(name="vote", description="Start a session attendance vote")
@@ -397,6 +471,44 @@ async def verify_setup(interaction: discord.Interaction, channel: discord.TextCh
         ephemeral=True,
     )
 
+# --- TICKET COMMANDS ---
+@ticket_group.command(name="setup", description="Post the exact support ticket panel")
+@app_commands.describe(
+    channel="The channel to send the ticket panel in",
+    image_url="The image URL for the support banner"
+)
+async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, image_url: str):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        embed = discord.Embed(
+            title="GVRC Support",
+            description=(
+                "**Welcome to the Greenville Roleplay Central Support Center.** To receive assistance, please open a formal support ticket "
+                "within this channel; our staff team aims to address all inquiries efficiently, with response times prioritized according to the "
+                "nature and urgency of the request. Please be advised that any misuse or abuse of this system will result in a permanent "
+                "blacklist from our support services. Additionally, ensure you remain active within your request, as tickets will be closed "
+                "automatically if no response is received within 12 hours.\n\n"
+                "**General Support** - For any random, questions or enquiries or perk requests.\n\n"
+                "**Staff Report** - Feel like a staff member has treated you unfairly? Open one of these and submit your evidence.\n\n"
+                "**Affiliation Request** - Request a partnership with GVRC."
+            ),
+            color=discord.Color.from_rgb(40, 45, 55)
+        )
+        if image_url:
+            embed.set_image(url=image_url)
+
+        view = TicketView()
+        await channel.send(embed=embed, view=view)
+        await interaction.followup.send(
+            f"Ticket panel successfully sent to {channel.mention}!",
+            ephemeral=True,
+        )
+    except Exception:
+        await interaction.followup.send(
+            f"Failed to send ticket panel. Make sure I have 'Send Messages' permissions in {channel.mention}!",
+            ephemeral=True,
+        )
+
 # --- APPLICATION COMMANDS ---
 @application_group.command(name="passed", description="Announce an accepted application")
 @app_commands.describe(user="The user who passed the application")
@@ -465,11 +577,14 @@ bot.tree.add_command(shift_group)
 bot.tree.add_command(verify_group)
 bot.tree.add_command(staff_group)
 bot.tree.add_command(application_group)
+bot.tree.add_command(ticket_group)
 
 @bot.event
 async def on_ready():
     bot.add_view(ShiftView())
     bot.add_view(VerifyView())
+    bot.add_view(TicketView())
+    bot.add_view(TicketCloseView())
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
