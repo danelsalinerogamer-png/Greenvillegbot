@@ -246,7 +246,7 @@ class TicketModal(discord.ui.Modal):
 
         embed = discord.Embed(
             title=f"Support Ticket — {interaction.user.display_name}",
-            description=f"**Category:** {self.title}\n**Reason:**\n{self.reason.value}",
+            description=f"**Category:** {self.title}\n**Status:** Unclaimed\n**Reason:**\n{self.reason.value}",
             color=discord.Color.from_rgb(46, 204, 113)
         )
         embed.set_footer(text="Greenville Roleplay Globe • Support System")
@@ -258,6 +258,34 @@ class TicketModal(discord.ui.Modal):
 class TicketCloseView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.success, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
+    async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Optional: Add a check here if you only want staff to claim (e.g. check for a staff role ID)
+        
+        # Update embed description to show claimed status
+        embed = interaction.message.embeds[0]
+        # Replace or update status line in description
+        desc_lines = embed.description.split("\n")
+        new_desc_lines = []
+        for line in desc_lines:
+            if line.startswith("**Status:**"):
+                new_desc_lines.append(f"**Status:** Claimed by {interaction.user.mention}")
+            else:
+                new_desc_lines.append(line)
+        
+        # If Status wasn't explicitly found, insert it
+        if not any(line.startswith("**Status:**") for line in desc_lines):
+            new_desc_lines.insert(1, f"**Status:** Claimed by {interaction.user.mention}")
+
+        embed.description = "\n".join(new_desc_lines)
+        
+        # Disable the claim button after it's clicked
+        button.disabled = True
+        button.label = f"Claimed by {interaction.user.display_name}"
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.followup.send(f"🔒 This ticket has been claimed by {interaction.user.mention}.", ephemeral=False)
 
     @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
