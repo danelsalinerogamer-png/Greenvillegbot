@@ -544,9 +544,9 @@ async def app_denied(interaction: discord.Interaction, user: discord.Member):
 @app_commands.describe(
     title="The title of the embed",
     description="The main text/content of the embed",
-    image_url="The image URL you want to display"
+    image_url="The image URL you want to display (Optional)"
 )
-async def custom_embed(interaction: discord.Interaction, title: str, description: str, image_url: str):
+async def custom_embed(interaction: discord.Interaction, title: str, description: str, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
     
     embed = discord.Embed(
@@ -555,7 +555,9 @@ async def custom_embed(interaction: discord.Interaction, title: str, description
         color=discord.Color.from_rgb(46, 204, 113)
     )
     
-    embed.set_image(url=image_url)
+    if image_url:
+        embed.set_image(url=image_url)
+        
     embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
     
     await interaction.channel.send(embed=embed)
