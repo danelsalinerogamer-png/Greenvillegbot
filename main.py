@@ -539,6 +539,28 @@ async def app_denied(interaction: discord.Interaction, user: discord.Member):
     embed = discord.Embed(title="❌ Denied", description=f"Sorry {user.mention}.", color=discord.Color.red())
     await interaction.followup.send(embed=embed)
 
+# --- CUSTOM EMBED COMMAND ---
+@bot.tree.command(name="embed", description="Create a custom embed with a default green color")
+@app_commands.describe(
+    title="The title of the embed",
+    description="The main text/content of the embed",
+    image_url="The image URL you want to display"
+)
+async def custom_embed(interaction: discord.Interaction, title: str, description: str, image_url: str):
+    await interaction.response.defer(ephemeral=True)
+    
+    embed = discord.Embed(
+        title=title,
+        description=description.replace("\\n", "\n"),
+        color=discord.Color.from_rgb(46, 204, 113)
+    )
+    
+    embed.set_image(url=image_url)
+    embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+    
+    await interaction.channel.send(embed=embed)
+    await interaction.followup.send("Your custom embed has been successfully sent!", ephemeral=True)
+
 # --- REGISTER GROUPS ---
 bot.tree.add_command(session_group)
 bot.tree.add_command(shift_group)
