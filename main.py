@@ -549,19 +549,22 @@ async def app_denied(interaction: discord.Interaction, user: discord.Member):
 async def custom_embed(interaction: discord.Interaction, title: str, description: str, image_url: str = None):
     await interaction.response.defer(ephemeral=True)
     
-    embed = discord.Embed(
-        title=title,
-        description=description.replace("\\n", "\n"),
-        color=discord.Color.from_rgb(46, 204, 113)
-    )
-    
-    if image_url:
-        embed.set_image(url=image_url)
+    try:
+        embed = discord.Embed(
+            title=title,
+            description=description.replace("\\n", "\n"),
+            color=discord.Color.from_rgb(46, 204, 113)
+        )
         
-    embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
-    
-    await interaction.channel.send(embed=embed)
-    await interaction.followup.send("Your custom embed has been successfully sent!", ephemeral=True)
+        if image_url:
+            embed.set_image(url=image_url)
+            
+        embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+        
+        await interaction.channel.send(embed=embed)
+        await interaction.followup.send("Your custom embed has been successfully sent!", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"Failed to send embed. Error: {e}", ephemeral=True)
 
 # --- REGISTER GROUPS ---
 bot.tree.add_command(session_group)
