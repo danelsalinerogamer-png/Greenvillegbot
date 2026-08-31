@@ -561,9 +561,14 @@ async def custom_embed(interaction: discord.Interaction, title: str, description
             
         embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
         
+        # Sends embed publicly to the channel
         await interaction.channel.send(embed=embed)
+        # Clears the thinking state with a private confirmation
         await interaction.followup.send("Your custom embed has been successfully sent!", ephemeral=True)
+        
     except Exception as e:
+        # Prints exact error in your bot console so you can see why it failed
+        print(f"ERROR IN /embed COMMAND: {e}")
         await interaction.followup.send(f"Failed to send embed. Error: {e}", ephemeral=True)
 
 # --- REGISTER GROUPS ---
